@@ -15,8 +15,9 @@ Volume Ratio: {s['volume_ratio']}
 Confidence: {s['confidence']}
 """
         r = client.chat.completions.create(
-            model="llama3-8b-8192",
+            model="llama-3.1-8b-instant",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.4
+            temperature=0.4,
+            max_tokens=120
         )
         return r.choices[0].message.content.strip()
