@@ -1,26 +1,26 @@
 import feedparser
+from urllib.parse import quote_plus
 
 class NewsAgent:
     def run(self, ticker):
+        # Build query safely
         query = f"{ticker} saham Indonesia"
-        url = f"https://news.google.com/rss/search?q={query}"
+        encoded_query = quote_plus(query)
+
+        url = f"https://news.google.com/rss/search?q={encoded_query}"
 
         feed = feedparser.parse(url)
-        items = feed.get("entries", [])
+        entries = feed.get("entries", [])
 
-        if not items:
+        if not entries:
             return None
 
-        # Ambil 3 berita terbaru
-        top3 = items[:3]
-
-        # Format
         news_list = []
-        for item in top3:
+        for item in entries[:3]:  # ambil 3 terbaru
             news_list.append({
-                "title": item.get("title"),
-                "link": item.get("link"),
-                "published": item.get("published"),
+                "title": item.get("title", ""),
+                "link": item.get("link", ""),
+                "published": item.get("published", ""),
                 "summary": item.get("summary", "")
             })
 
