@@ -3,3 +3,4 @@ yfinance
 requests
 groq
 python-dotenv
+feedparser
