@@ -1,0 +1,4 @@
+IDX_TICKERS = [
+    "BBRI.JK", "BBCA.JK", "BMRI.JK",
+    "TLKM.JK", "ASII.JK", "INDF.JK"
+]
