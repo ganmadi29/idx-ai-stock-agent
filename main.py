@@ -6,11 +6,13 @@ from agents.narrator import NarratorAgent
 from tools.market_api import get_stock_data
 from tools.storage import save_signal
 from tools.telegram import send_telegram_message
+from agents.news_agent import NewsAgent
 
 def main():
     analyst = AnalystAgent()
     validator = ValidatorAgent()
     narrator = NarratorAgent()
+    news_agent = NewsAgent()
 
     today = datetime.utcnow().strftime("%Y-%m-%d")
 
@@ -20,6 +22,9 @@ def main():
         if not base:
             continue
 
+        news = news_agent.run(ticker)
+        base["news"] = news
+        
         valid = validator.run(base)
         if not valid:
             continue
