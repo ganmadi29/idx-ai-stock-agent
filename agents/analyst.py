@@ -1,19 +1,36 @@
+import pandas as pd
+from tools.indicators import rsi
+
 class AnalystAgent:
-    def run(self, df):
-        if len(df) < 5:
-            return None
+    def analyze(self, df: pd.DataFrame):
+        latest = df.iloc[-1]
+        high_20 = df["High"].rolling(20).max().iloc[-2]
+        high_10 = df["High"].rolling(10).max().iloc[-2]
+        vol_avg = df["Volume"].rolling(20).mean().iloc[-2]
 
-        last = df.iloc[-1]
-        prev = df.iloc[-2]
+        reasons = []
 
-        avg_vol = df["Volume"].tail(5).mean()
-        price_change = (last["Close"] - prev["Close"]) / prev["Close"]
-        volume_ratio = last["Volume"] / avg_vol
+        if latest["Close"] > high_20:
+            reasons.append("B20DH")
+        elif latest["Close"] > high_10:
+            reasons.append("B10DH")
 
-        if price_change > 0.03 and volume_ratio > 1.5:
+        if latest["Volume"] > vol_avg * 2:
+            reasons.append(f"Vx{round(latest['Volume']/vol_avg,1)}")
+
+        rsi_val = rsi(df["Close"]).iloc[-1]
+        if rsi_val < 70:
+            reasons.append("RSI_OK")
+
+        score = len(reasons)
+
+        if score >= 2:
             return {
-                "ticker": last["ticker"],
-                "signal_price": round(last["Close"], 2),
-                "price_change_pct": round(price_change * 100, 2),
-                "volume_ratio": round(volume_ratio, 2)
+                "price": latest["Close"],
+                "volume_ratio": round(latest["Volume"]/vol_avg,2),
+                "rsi": round(rsi_val,1),
+                "reason": " + ".join(reasons),
+                "score": score
             }
+
+        return None
