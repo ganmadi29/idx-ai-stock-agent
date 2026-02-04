@@ -6,8 +6,10 @@ client = Groq(api_key=GROQ_API_KEY)
 class NarratorAgent:
     def run(self, signal):
         prompt = f"""
-You are an Indonesian stock market analyst (IDX).
+You are a professional swing trader and equity research analyst. (IDX).
 Create a concise insight (max 2 sentences).
+Time horizon: Swing trade (5–30 trading days)
+Risk profile: Medium risk
 
 Ticker: {signal['ticker']}
 Price: {signal['price']}
