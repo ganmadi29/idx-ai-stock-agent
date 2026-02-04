@@ -1,34 +1,51 @@
 import yfinance as yf
+from tools.watchlist import load_watchlist
 from agents.analyst import AnalystAgent
 from agents.narrator import NarratorAgent
-import pandas as pd
-from datetime import datetime
+from tools.telegram import send_telegram
 
-WATCHLIST = ["BBCA.JK","BMRI.JK","ADRO.JK"]
+def main():
+    watchlist = load_watchlist()
+    analyst = AnalystAgent()
+    narrator = NarratorAgent()
 
-analyst = AnalystAgent()
-narrator = NarratorAgent()
+    signals = []
 
-logs = []
+    for _, row in watchlist.iterrows():
+        if not row["enabled"]:
+            continue
 
-for t in WATCHLIST:
-    df = yf.download(t, period="6mo", progress=False)
-    if df.empty:
-        continue
+        ticker = row["ticker"]
+        lookback = int(row["lookback"])
+        vol_mult = float(row["vol_mult"])
 
-    signal = analyst.analyze(df)
-    if not signal:
-        continue
+        df = yf.download(ticker, period="4mo", progress=False)
 
-    insight = narrator.run(t, signal)
-    print(f"\n🔥 {t}\n{insight}")
+        if df.empty:
+            continue
 
-    logs.append({
-        "date": datetime.now().strftime("%Y-%m-%d"),
-        "ticker": t,
-        "reason": signal["reason"],
-        "price": signal["price"]
-    })
+        signal = analyst.analyze(df)
 
-if logs:
-    pd.DataFrame(logs).to_csv("data/signals_log.csv",mode="a",index=False,header=False)
+        if signal:
+            signal["ticker"] = ticker
+            signal["lookback"] = lookback
+            signal["vol_mult"] = vol_mult
+            signal["insight"] = narrator.run(signal)
+            signals.append(signal)
+
+    if not signals:
+        send_telegram("📭 No signal today.")
+        return
+
+    msg = "🚀 <b>IDX Breakout Signals</b>\n\n"
+    for s in signals:
+        msg += (
+            f"<b>{s['ticker']}</b>\n"
+            f"Reason: {s['reason']}\n"
+            f"Insight: {s['insight']}\n\n"
+        )
+
+    send_telegram(msg)
+
+if __name__ == "__main__":
+    main()
