@@ -37,18 +37,16 @@ def main():
         send_telegram("📭 No signal today.")
         return
 
-    msg = "🚀 <b>IDX Breakout Signals</b>\n\n"
-    for s in signals:
-        arrow = "🟢" if s["change_pct"] >= 0 else "🔴"
+    send_telegram(
+        "🚀 <b>IDX Daily Breakout Signals</b>\n"
+        "Scan completed.\n")
+    
+    for signal in signals:
         
-        msg += (
-            f"<b>{s['ticker']}</b>\n"
-            f"Price: {s['price']} ({arrow} {s['change_pct']}%)\n"
-            f"Reason: {s['reason']}\n"
-            f"Insight: {s['insight']}\n\n"
-        )
+        message = format_signal_message(signal)
+        send_telegram(message)
 
-    send_telegram(msg)
+
 
 if __name__ == "__main__":
     main()
