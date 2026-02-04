@@ -14,6 +14,9 @@ Price: {signal['price']}
 Price Change: {signal['change_pct']}%
 Volume Ratio: {signal['volume_ratio']}
 RSI: {signal['rsi']}
+MA20: {signal['ma20']}
+MA50: {signal['ma50']}
+Confidence: {signal['confidence']}
 Reason: {signal['reason']}
 Score: {signal['score']}
 """
