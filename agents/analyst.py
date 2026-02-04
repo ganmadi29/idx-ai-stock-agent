@@ -42,6 +42,7 @@ class AnalystAgent:
         if score >= 2:
             return {
                 "price": round(close_price, 2),
+                "change_pct": round(df["Close"].pct_change().iloc[-1] * 100, 2),
                 "volume_ratio": round(vol_ratio, 2),
                 "rsi": round(rsi_val, 1),
                 "reason": " + ".join(reasons),
