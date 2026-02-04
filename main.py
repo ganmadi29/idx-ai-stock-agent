@@ -39,8 +39,11 @@ def main():
 
     msg = "🚀 <b>IDX Breakout Signals</b>\n\n"
     for s in signals:
+        arrow = "🟢" if s["change_pct"] >= 0 else "🔴"
+        
         msg += (
             f"<b>{s['ticker']}</b>\n"
+            f"Price: {s['price']} ({arrow} {s['change_pct']}%)\n"
             f"Reason: {s['reason']}\n"
             f"Insight: {s['insight']}\n\n"
         )
