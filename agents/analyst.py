@@ -93,7 +93,7 @@ class AnalystAgent:
             "ticker": df.attrs["ticker"],
             "price": round(close, 2),
             "change_pct": round(change_pct, 2),
-            "vol_ratio": round(vol_ratio, 2),
+            "volume_ratio": round(vol_ratio, 2),
             "rsi": round(rsi_val, 1),
             "ma20": round(ma20, 2),
             "ma50": round(ma50, 2),
