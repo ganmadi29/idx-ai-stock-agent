@@ -1,17 +1,10 @@
-def format_signal_message(signal: dict) -> str:
-    reasons = "\n".join(f"• {r}" for r in signal["reasons"])
-
-    return f"""
-📈 <b>{signal['ticker']}</b>
-
-<b>Price</b>   : {signal['price']} ({signal['price_change']})
-<b>Volume</b>  : {signal['volume_ratio']}x avg
-<b>Signal</b>  : <b>{signal['signal']}</b>
-<b>Score</b>   : {signal['score']} / 5
-
-<b>Reason</b>
-{reasons}
-
-<b>Insight</b>
-{signal['insight']}
-""".strip()
+def format_signal_message(signal):
+    return (
+        f"🔥 <b>{signal['ticker']}</b>\n"
+        f"Price: {signal['price']} ({signal['change']}%)\n"
+        f"Score: <b>{signal['score']:.2f}</b>\n\n"
+        f"Reason:\n"
+        f"• {signal['reason']}\n\n"
+        f"Insight:\n"
+        f"{signal['insight']}"
+    )
