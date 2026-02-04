@@ -1,12 +1,51 @@
 import pandas as pd
+import yfinance as yf
 
-df = pd.read_csv("signals_log.csv")
-df["win"] = df["price_change_pct"] > 0
+LOOKAHEAD = 5
 
-summary = df.groupby("confidence").agg(
-    total=("win", "count"),
-    win_rate=("win", "mean")
-)
+def future_return(ticker, date):
+    df = yf.download(ticker, period="1mo", progress=False)
+    df.index = pd.to_datetime(df.index)
 
-summary["win_rate"] = (summary["win_rate"] * 100).round(2)
-print(summary)
+    date = pd.to_datetime(date)
+    future = df[df.index > date].head(LOOKAHEAD)
+
+    if future.empty:
+        return None
+
+    entry = df[df.index <= date].iloc[-1]["Close"]
+    exit = future.iloc[-1]["Close"]
+
+    return (exit-entry)/entry*100
+
+
+def analyze(csv="data/signals_log.csv"):
+    df = pd.read_csv(csv)
+    rows = []
+
+    for _, r in df.iterrows():
+        ret = future_return(r["ticker"], r["date"])
+        if ret is None:
+            continue
+
+        for reason in r["reason"].split(" + "):
+            rows.append({
+                "reason": reason,
+                "win": ret > 0,
+                "return": ret
+            })
+
+    res = pd.DataFrame(rows)
+    return (
+        res.groupby("reason")
+        .agg(
+            trades=("win","count"),
+            win_rate=("win","mean"),
+            avg_return=("return","mean")
+        )
+        .assign(win_rate=lambda x: x.win_rate*100)
+        .sort_values("win_rate",ascending=False)
+    )
+
+if __name__ == "__main__":
+    print(analyze())
