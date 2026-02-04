@@ -5,36 +5,26 @@ from config.settings import GROQ_API_KEY
 client = Groq(api_key=GROQ_API_KEY)
 
 class NarratorAgent:
-    def run(self, s):
-        """
-        s: dict with keys:
-            ticker
-            price_change_pct
-            volume_ratio
-            confidence
-            news (list of dict) — optional
-        """
+    def run(self, ticker, signal):
+        news = NewsAgent().get_news(ticker)
 
-        # Build news section if exists
-        news_block = ""
-        if s.get("news"):
-            for i, n in enumerate(s["news"]):
-                title = n.get("title", "").strip()
-                published = n.get("published", "").strip()
-                link = n.get("link", "").strip()
-                news_block += f"{i+1}. {title} ({published})\n{link}\n\n"
-
-        # Build the prompt
         prompt = f"""
-You are an Indonesian stock market analyst (IDX).
-Create a concise insight (maximum 2 sentences). Focus on the quantitative change,
-and only mention the news if it clearly explains the stock's movement.
+You are a stock market analyst.
+Explain this signal in clear, short Indonesian.
 
-Ticker: {s['ticker']}
-Price Change: {s['price_change_pct']}%
-Volume Ratio: {s['volume_ratio']}
-Confidence Level: {s['confidence']}
+Ticker: {ticker}
+Price: {signal['price']}
+Reason: {signal['reason']}
+RSI: {signal['rsi']}
+Volume Ratio: {signal['volume_ratio']}
 
+Recent News:
+{news}
+
+Explain:
+- What happened technically
+- Why it matters
+- Short risk reminder
 """
 
         if news_block:
