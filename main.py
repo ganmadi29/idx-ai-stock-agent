@@ -39,7 +39,7 @@ def main():
         s for s in signals
         if s["confidence"] == "HIGH"
         and "MA_TREND" in s["reasons"]
-        and s["vol_ratio"] >= 2
+        and s["volume_ratio"] >= 2
     ]
     
     signals = sorted(signals, key=lambda x: x["score"], reverse=True)
