@@ -3,6 +3,7 @@ from tools.watchlist import load_watchlist
 from agents.analyst import AnalystAgent
 from agents.narrator import NarratorAgent
 from tools.telegram import send_telegram
+from tools.formatter import format_signal_message
 
 def main():
     watchlist = load_watchlist()
