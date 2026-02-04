@@ -11,6 +11,7 @@ Create a concise insight (max 2 sentences).
 
 Ticker: {signal['ticker']}
 Price: {signal['price']}
+Price Change: {signal['change_pct']}%
 Volume Ratio: {signal['volume_ratio']}
 RSI: {signal['rsi']}
 Reason: {signal['reason']}
