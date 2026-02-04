@@ -24,7 +24,8 @@ def main():
 
         if df.empty:
             continue
-
+            
+        df.attrs["ticker"] = ticker
         signal = analyst.analyze(df)
 
         if signal:
