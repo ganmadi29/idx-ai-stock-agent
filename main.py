@@ -34,7 +34,17 @@ def main():
             signal["vol_mult"] = vol_mult
             signal["insight"] = narrator.run(signal)
             signals.append(signal)
-
+            
+    signals = [
+        s for s in signals
+        if s["confidence"] == "HIGH"
+        and "MA_TREND" in s["reasons"]
+        and s["vol_ratio"] >= 2
+    ]
+    
+    signals = sorted(signals, key=lambda x: x["score"], reverse=True)
+    signals = signals[:10]
+    
     if not signals:
         send_telegram("📭 No signal today.")
         return
