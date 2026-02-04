@@ -1,6 +1,4 @@
 pandas
 yfinance
-requests
-groq
-python-dotenv
 feedparser
+groq
