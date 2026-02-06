@@ -35,6 +35,7 @@ Important rules:
 Be objective, not bullish by default
 Clearly state if NO TRADE is the best decision
 Focus on probabilities, not certainty
+And no SHORT Recommendation only SPOT
 
 Ticker: {signal['ticker']}
 Price: {signal['price']}
