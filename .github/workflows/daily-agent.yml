@@ -2,7 +2,7 @@ name: IDX AI Agent
 
 on:
   schedule:
-    - cron: '0 1 * * *'
+    - cron: '0 1,3,4,8 * * *' # 08, 10, 11, 15 WIB
   workflow_dispatch:
 
 jobs:
