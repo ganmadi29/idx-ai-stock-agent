@@ -5,6 +5,49 @@ from agents.narrator import NarratorAgent
 from tools.telegram import send_telegram
 from tools.formatter import format_signal_message
 
+# =============================
+# GOOGLE SHEETS INIT
+# =============================
+
+def get_gspread_client():
+    creds = Credentials.from_service_account_info(
+        json.loads(os.environ["GCP_SA_KEY"]),
+        scopes=["https://www.googleapis.com/auth/spreadsheets"]
+    )
+    return gspread.authorize(creds)
+
+
+
+# =============================
+# LOG SIGNALS
+# =============================
+
+def log_signals(gc, signals):
+    if not signals:
+        return
+
+    ws = gc.open_by_key(SPREADSHEET_ID).worksheet(LOG_SHEET)
+    today = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    rows = []
+    for s in signals:
+        rows.append([
+            today,
+            s.get("ticker"),
+            s.get("price"),
+            s.get("change"),
+            s.get("volume_ratio"),
+            s.get("rsi"),
+            s.get("fundamental"),
+            ", ".join(s.get("reasons", [])),
+            s.get("score"),
+            s.get("confidence")
+        ])
+
+    ws.append_rows(rows, value_input_option="USER_ENTERED")
+
+
+
 def main():
     watchlist = load_watchlist()
     analyst = AnalystAgent()
@@ -52,6 +95,8 @@ def main():
     send_telegram(
         "🚀 <b>IDX Daily Breakout Signals</b>\n"
         "Scan completed.\n")
+
+    log_signals(gc, signals)
     
     for signal in signals:
         
