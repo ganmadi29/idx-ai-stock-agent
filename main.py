@@ -48,7 +48,7 @@ def log_signals(gc, signals):
             today,
             s.get("ticker"),
             s.get("price"),
-            s.get("change"),
+            s.get("change_pct"),
             s.get("volume_ratio"),
             s.get("rsi"),
             s.get("fundamental"),
