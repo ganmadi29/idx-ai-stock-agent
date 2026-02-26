@@ -10,6 +10,7 @@ from agents.analyst import AnalystAgent
 from agents.narrator import NarratorAgent
 from tools.telegram import send_telegram
 from tools.formatter import format_signal_message
+from datetime import datetime
 
 import gspread
 from google.oauth2.service_account import Credentials
