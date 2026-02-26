@@ -1,4 +1,5 @@
 import yfinance as yf
+import json
 from tools.watchlist import load_watchlist
 from agents.analyst import AnalystAgent
 from agents.narrator import NarratorAgent
