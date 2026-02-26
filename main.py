@@ -8,7 +8,7 @@ from tools.formatter import format_signal_message
 # =============================
 # GOOGLE SHEETS INIT
 # =============================
-
+LOG_SHEET = "AI_log"
 def get_gspread_client():
     creds = Credentials.from_service_account_info(
         json.loads(os.environ["GCP_SA_KEY"]),
