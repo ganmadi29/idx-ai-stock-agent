@@ -8,7 +8,10 @@ from tools.formatter import format_signal_message
 # =============================
 # GOOGLE SHEETS INIT
 # =============================
+SPREADSHEET_ID = "1oBUHkoXJ95pMeJAf3k5FXxHQQJFbx8rt5ebyg0tTbQg"
+WORKSHEET_NAME = "watchlist"
 LOG_SHEET = "AI_log"
+
 def get_gspread_client():
     creds = Credentials.from_service_account_info(
         json.loads(os.environ["GCP_SA_KEY"]),
@@ -49,6 +52,7 @@ def log_signals(gc, signals):
 
 
 def main():
+    gc = get_gspread_client()
     watchlist = load_watchlist()
     analyst = AnalystAgent()
     narrator = NarratorAgent()
