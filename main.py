@@ -18,7 +18,7 @@ from google.oauth2.service_account import Credentials
 # =============================
 # GOOGLE SHEETS INIT
 # =============================
-SPREADSHEET_ID = "1oBUHkoXJ95pMeJAf3k5FXxHQQJFbx8rt5ebyg0tTbQg"
+SPREADSHEET_ID = os.environ["SPREADSHEET_ID"]
 WORKSHEET_NAME = "watchlist"
 LOG_SHEET = "AI_log"
 
