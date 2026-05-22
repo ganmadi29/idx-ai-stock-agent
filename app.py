@@ -15,37 +15,48 @@ st.set_page_config(
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
 
-def _get_secrets():
-    sa_key = st.secrets.get("GCP_SA_KEY") or os.environ.get("GCP_SA_KEY")
+def _get_sa_info():
+    # Preferred: TOML table format [gcp_service_account] in Streamlit secrets
+    if "gcp_service_account" in st.secrets:
+        return dict(st.secrets["gcp_service_account"])
+    # Fallback: raw JSON string in env var (GitHub Actions / local)
+    raw = st.secrets.get("GCP_SA_KEY") or os.environ.get("GCP_SA_KEY")
+    if raw:
+        return json.loads(raw)
+    st.error(
+        "Missing Google credentials. Add this to Streamlit Cloud → Settings → Secrets:\n\n"
+        "```toml\n"
+        "[gcp_service_account]\n"
+        'type = "service_account"\n'
+        'project_id = "your-project-id"\n'
+        'private_key_id = "your-key-id"\n'
+        'private_key = "-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----\\n"\n'
+        'client_email = "your-sa@your-project.iam.gserviceaccount.com"\n'
+        'client_id = "your-client-id"\n'
+        'auth_uri = "https://accounts.google.com/o/oauth2/auth"\n'
+        'token_uri = "https://oauth2.googleapis.com/token"\n'
+        "```"
+    )
+    st.stop()
+
+def _get_sheet_id():
     sheet_id = st.secrets.get("SPREADSHEET_ID") or os.environ.get("SPREADSHEET_ID")
-
-    missing = [k for k, v in [("GCP_SA_KEY", sa_key), ("SPREADSHEET_ID", sheet_id)] if not v]
-    if missing:
-        st.error(
-            f"Missing secret(s): **{', '.join(missing)}**\n\n"
-            "Add them in Streamlit Cloud → your app → **Settings → Secrets**:\n\n"
-            "```toml\n"
-            'GCP_SA_KEY = \'{"type":"service_account",...}\'\n'
-            'SPREADSHEET_ID = "your-spreadsheet-id"\n'
-            "```\n\n"
-            "Note: Streamlit Cloud secrets are separate from GitHub Actions secrets."
-        )
+    if not sheet_id:
+        st.error("Missing secret: **SPREADSHEET_ID**. Add it to Streamlit Cloud → Settings → Secrets.")
         st.stop()
-
-    return sa_key, sheet_id
+    return sheet_id
 
 @st.cache_resource
 def _gc():
-    sa_key, _ = _get_secrets()
     creds = Credentials.from_service_account_info(
-        json.loads(sa_key),
+        _get_sa_info(),
         scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"]
     )
     return gspread.authorize(creds)
 
 @st.cache_data(ttl=300, show_spinner="Loading signals...")
 def load_signals():
-    _, sheet_id = _get_secrets()
+    sheet_id = _get_sheet_id()
     ws = _gc().open_by_key(sheet_id).worksheet("AI_log")
     rows = ws.get_all_records()
     if not rows:
