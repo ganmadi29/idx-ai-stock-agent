@@ -16,12 +16,23 @@ st.set_page_config(
 # ─── Auth ─────────────────────────────────────────────────────────────────────
 
 def _get_secrets():
-    sa_key = st.secrets.get("GCP_SA_KEY") if hasattr(st, "secrets") else None
-    sheet_id = st.secrets.get("SPREADSHEET_ID") if hasattr(st, "secrets") else None
-    return (
-        sa_key or os.environ["GCP_SA_KEY"],
-        sheet_id or os.environ["SPREADSHEET_ID"],
-    )
+    sa_key = st.secrets.get("GCP_SA_KEY") or os.environ.get("GCP_SA_KEY")
+    sheet_id = st.secrets.get("SPREADSHEET_ID") or os.environ.get("SPREADSHEET_ID")
+
+    missing = [k for k, v in [("GCP_SA_KEY", sa_key), ("SPREADSHEET_ID", sheet_id)] if not v]
+    if missing:
+        st.error(
+            f"Missing secret(s): **{', '.join(missing)}**\n\n"
+            "Add them in Streamlit Cloud → your app → **Settings → Secrets**:\n\n"
+            "```toml\n"
+            'GCP_SA_KEY = \'{"type":"service_account",...}\'\n'
+            'SPREADSHEET_ID = "your-spreadsheet-id"\n'
+            "```\n\n"
+            "Note: Streamlit Cloud secrets are separate from GitHub Actions secrets."
+        )
+        st.stop()
+
+    return sa_key, sheet_id
 
 @st.cache_resource
 def _gc():
