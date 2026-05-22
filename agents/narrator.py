@@ -1,56 +1,72 @@
 from groq import Groq
 from config.settings import GROQ_API_KEY
 
-client = Groq(api_key=GROQ_API_KEY)
+_TRIGGER_LABELS = {
+    "MA_TREND":     "MA20 > MA50 (uptrend confirmed)",
+    "MA20_OK":      "Price above MA20",
+    "RSI_OK":       "RSI above neutral (50)",
+    "STRONG_TREND": "Price above MA50 (strong trend)",
+}
 
 class NarratorAgent:
+    def __init__(self):
+        self._client = Groq(api_key=GROQ_API_KEY)
+
     def run(self, signal):
-        prompt = f"""
-You are a professional swing trader and equity research analyst. (IDX).
-Create a concise insight (max 3 sentences).
-Time horizon: Swing trade (5–30 trading days)
-Risk profile: Medium risk
+        ma20 = signal['ma20']
+        ma50 = signal['ma50']
+        close = signal['price']
+        rsi = signal['rsi']
+        vol_ratio = signal['volume_ratio']
+        change_pct = signal['change_pct']
 
-1. TECHNICAL ANALYSIS
+        trend = "bullish" if ma20 > ma50 else "bearish"
+        rsi_state = "overbought" if rsi >= 70 else ("oversold" if rsi <= 30 else "neutral")
+        ma20_dist = round(((close - ma20) / ma20) * 100, 2)
 
-Identify the current trend using:
-- Market structure (HH, HL, LH, LL)
-- 20 / 50 MA
+        readable_triggers = "\n".join(
+            f"  • {_TRIGGER_LABELS.get(r, r)}"
+            for r in signal.get('reasons', [])
+            if not r.startswith('Vx')  # volume already shown in data
+        )
 
-Analyze momentum using:
-- RSI (divergence if any)
+        news_section = (
+            f"\nRecent News:\n{signal['news']}\n"
+            if signal.get('news') and signal['news'] != "No recent news."
+            else ""
+        )
 
-Identify key levels:
-- Major support & resistance
-- Volume profile / high volume nodes
+        system_msg = (
+            "You are a quantitative analyst specializing in the Indonesian Stock Exchange (IDX). "
+            "IDX is retail-driven with T+2 settlement and auto-rejection (ARB) limits. "
+            "Be objective and data-driven. Never invent price levels, patterns, or figures "
+            "not explicitly given to you."
+        )
 
-Candlestick confirmation:
-- Recent reversal or continuation patterns
-
-Volatility check:
-- ATR and recent range behavior
-
-Important rules:
-
-Be objective, not bullish by default
-Clearly state if NO TRADE is the best decision
-Focus on probabilities, not certainty
-And no SHORT Recommendation only SPOT
+        user_msg = f"""Review this IDX momentum signal:
 
 Ticker: {signal['ticker']}
-Price: {signal['price']}
-Price Change: {signal['change_pct']}%
-Volume Ratio: {signal['volume_ratio']}
-RSI: {signal['rsi']}
-MA20: {signal['ma20']}
-MA50: {signal['ma50']}
-Confidence: {signal['confidence']}
-Reason: {signal['reason']}
-Score: {signal['score']}
-"""
-        r = client.chat.completions.create(
-            model="llama-3.1-8b-instant",  # model aktif & stabil
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.4
-        )
-        return r.choices[0].message.content.strip()
+Price: {close} ({change_pct:+.2f}% today, {ma20_dist:+.2f}% above MA20)
+Volume: {vol_ratio}x 20-day average
+RSI(14): {rsi} ({rsi_state})
+Trend: MA20 {ma20} vs MA50 {ma50} → {trend}{news_section}
+
+Signal triggers:
+{readable_triggers}
+
+Write 2-3 sentences covering: trend strength, what the volume and price move implies, and whether this is an actionable spot entry or NO TRADE. No short recommendations."""
+
+        try:
+            r = self._client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[
+                    {"role": "system", "content": system_msg},
+                    {"role": "user", "content": user_msg},
+                ],
+                temperature=0.3,
+                max_tokens=300,
+            )
+            return r.choices[0].message.content.strip()
+        except Exception as e:
+            print(f"[NarratorAgent] API error for {signal.get('ticker')}: {e}")
+            return "AI insight unavailable."

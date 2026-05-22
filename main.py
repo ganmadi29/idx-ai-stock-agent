@@ -1,13 +1,13 @@
 import yfinance as yf
 import json
 import os
-import json
 import requests
 import pandas as pd
 
 from tools.watchlist import load_watchlist
 from agents.analyst import AnalystAgent
 from agents.narrator import NarratorAgent
+from agents.news_agent import NewsAgent
 from tools.telegram import send_telegram
 from tools.formatter import format_signal_message
 from datetime import datetime
@@ -51,7 +51,6 @@ def log_signals(gc, signals):
             s.get("change_pct"),
             s.get("volume_ratio"),
             s.get("rsi"),
-            s.get("fundamental"),
             ", ".join(s.get("reasons", [])),
             s.get("score"),
             s.get("confidence")
@@ -66,6 +65,7 @@ def main():
     watchlist = load_watchlist()
     analyst = AnalystAgent()
     narrator = NarratorAgent()
+    news_agent = NewsAgent()
 
     signals = []
 
@@ -81,7 +81,7 @@ def main():
 
         if df.empty:
             continue
-            
+
         df.attrs["ticker"] = ticker
         signal = analyst.analyze(df)
 
@@ -89,6 +89,7 @@ def main():
             signal["ticker"] = ticker
             signal["lookback"] = lookback
             signal["vol_mult"] = vol_mult
+            signal["news"] = news_agent.get_news(ticker)
             signal["insight"] = narrator.run(signal)
             signals.append(signal)
             

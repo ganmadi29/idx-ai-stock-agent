@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from tools.indicators import rsi
+from tools.indicators import rsi as compute_rsi
 
 class AnalystAgent:
     def analyze(self, df: pd.DataFrame):
@@ -28,17 +28,18 @@ class AnalystAgent:
         # =====================
         # RSI
         # =====================
-        delta = df["Close"].diff()
-        gain = delta.clip(lower=0)
-        loss = -delta.clip(upper=0)
-        rs = gain.rolling(14).mean() / loss.rolling(14).mean()
-        rsi = 100 - (100 / (1 + rs))
-        rsi_val = rsi.iloc[-1]
+        rsi_val = compute_rsi(df["Close"]).iloc[-1]
+        if pd.isna(rsi_val):
+            return None
 
         # =====================
         # PRICE CHANGE
         # =====================
         change_pct = ((close - prev_close) / prev_close) * 100
+
+        # Only alert on up-days; down-day volume spikes are bearish signals
+        if change_pct <= 0:
+            return None
 
         # =====================
         # REASONS
