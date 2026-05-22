@@ -5,3 +5,5 @@ groq
 gspread
 google-auth
 requests
+streamlit
+plotly
