@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IDX Signal Monitor</title>
+  <script src="https://www.gstatic.com/charts/loader.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',sans-serif;background:#f4f6f9;color:#333}
+    header{background:#1a1a2e;color:#fff;padding:18px 32px;display:flex;align-items:center;gap:12px}
+    header h1{font-size:1.4rem;font-weight:600}
+    #debug-bar{background:#fff3cd;padding:10px 32px;font-size:0.82rem;border-bottom:1px solid #ffc107;display:none}
+    .filters{background:#fff;padding:14px 32px;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;border-bottom:1px solid #e0e0e0}
+    .filters label{font-size:0.82rem;color:#666;display:flex;flex-direction:column;gap:4px}
+    .filters select,.filters input{padding:6px 10px;border:1px solid #ccc;border-radius:6px;font-size:0.88rem}
+    .btn{padding:7px 16px;background:#1a1a2e;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.88rem}
+    .btn.grey{background:#6c757d}
+    #count{font-size:0.82rem;color:#888}
+    .tabs{display:flex;background:#fff;border-bottom:2px solid #e0e0e0;padding:0 32px;overflow-x:auto}
+    .tab{padding:12px 22px;cursor:pointer;font-size:0.9rem;border-bottom:3px solid transparent;margin-bottom:-2px;color:#666;white-space:nowrap}
+    .tab.active{border-bottom-color:#1a1a2e;color:#1a1a2e;font-weight:600}
+    .page{display:none;padding:24px 32px}
+    .page.active{display:block}
+    .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+    .metric{background:#fff;border-radius:10px;padding:20px 24px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+    .metric .lbl{font-size:.75rem;color:#888;text-transform:uppercase;letter-spacing:.5px}
+    .metric .val{font-size:1.8rem;font-weight:700;margin-top:6px;color:#1a1a2e}
+    .metric .sub{font-size:.78rem;color:#aaa;margin-top:2px}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+    .card{background:#fff;border-radius:10px;padding:24px 28px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+    .card h3{font-size:.9rem;color:#555;margin-bottom:16px;font-weight:600}
+    .chart-box{width:100%;height:400px}
+    table{width:100%;border-collapse:collapse;font-size:.84rem}
+    th{background:#f8f9fa;padding:9px 12px;text-align:left;font-weight:600;color:#555;border-bottom:2px solid #e0e0e0}
+    td{padding:8px 12px;border-bottom:1px solid #f0f0f0}
+    tr:hover td{background:#fafafa}
+    .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:.74rem;font-weight:600}
+    .HIGH{background:#d4edda;color:#155724}
+    .MEDIUM{background:#fff3cd;color:#856404}
+    .LOW{background:#f8d7da;color:#721c24}
+    .pos{color:#28a745;font-weight:600}
+    .neg{color:#dc3545;font-weight:600}
+    .loading{text-align:center;padding:60px;color:#aaa}
+    .no-data{text-align:center;padding:40px;color:#aaa;font-size:.88rem}
+    @media(max-width:768px){
+      .metrics{grid-template-columns:1fr 1fr}
+      .grid2{grid-template-columns:1fr}
+      .page{padding:16px}
+      .filters{padding:12px 16px}
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <span style="font-size:1.6rem">📈</span>
+  <h1>IDX AI Signal Monitor</h1>
+</header>
+
+<div id="debug-bar"></div>
+
+<div class="filters">
+  <label>From<input type="date" id="f-from"></label>
+  <label>To<input type="date" id="f-to"></label>
+  <label>Confidence
+    <select id="f-conf"><option value="">All</option></select>
+  </label>
+  <label>Ticker
+    <select id="f-ticker"><option value="">All</option></select>
+  </label>
+  <button class="btn" onclick="applyFilters()">Apply</button>
+  <button class="btn grey" onclick="resetFilters()">Reset</button>
+  <span id="count"></span>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('overview',this)">Overview</div>
+  <div class="tab" onclick="showTab('signals',this)">Signals</div>
+  <div class="tab" onclick="showTab('winrate',this)">Win Rate</div>
+  <div class="tab" onclick="showTab('holding',this)">Holding Period</div>
+  <div class="tab" onclick="showTab('score',this)">Score Analysis</div>
+</div>
+
+<!-- OVERVIEW -->
+<div id="page-overview" class="page active">
+  <div class="loading">Loading…</div>
+</div>
+
+<!-- SIGNALS -->
+<div id="page-signals" class="page">
+  <div class="card" style="overflow-x:auto">
+    <table>
+      <thead><tr>
+        <th>Date</th><th>Ticker</th><th>Price</th><th>Change%</th>
+        <th>Vol Ratio</th><th>RSI</th><th>Confidence</th><th>Score</th>
+        <th>D1%</th><th>D3%</th><th>D5%</th><th>D10%</th><th>Triggers</th>
+      </tr></thead>
+      <tbody id="tbl-signals"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- WIN RATE -->
+<div id="page-winrate" class="page">
+  <div class="grid2" style="margin-bottom:20px">
+    <div class="card">
+      <h3>Win Rate by Confidence</h3>
+      <div id="ch-conf" class="chart-box"></div>
+    </div>
+    <div class="card">
+      <h3>Win Rate by Trigger</h3>
+      <div id="ch-trig" class="chart-box"></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Per-Ticker Performance (D5 Return)</h3>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr>
+          <th>Ticker</th><th>Trades</th><th>Win Rate</th>
+          <th>Avg D1%</th><th>Avg D3%</th><th>Avg D5%</th><th>Avg D10%</th>
+        </tr></thead>
+        <tbody id="tbl-ticker"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- HOLDING PERIOD -->
+<div id="page-holding" class="page">
+  <div class="grid2" style="margin-bottom:20px">
+    <div class="card">
+      <h3>Avg Return by Holding Day</h3>
+      <div id="ch-holding-avg" class="chart-box"></div>
+    </div>
+    <div class="card">
+      <h3>Win Rate by Holding Day</h3>
+      <div id="ch-holding-wr" class="chart-box"></div>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:20px">
+    <h3>Avg Return per Holding Day — Top 5 Tickers</h3>
+    <div id="ch-holding-line" style="width:100%;height:420px"></div>
+  </div>
+  <div class="card">
+    <h3>Best Holding Day per Ticker</h3>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr>
+          <th>Ticker</th><th>Best Day</th><th>Avg Return</th><th>Win Rate</th><th>Trades</th>
+        </tr></thead>
+        <tbody id="tbl-holding-best"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- SCORE ANALYSIS -->
+<div id="page-score" class="page">
+  <div style="margin-bottom:16px">
+    <label style="font-size:.85rem;color:#555">Compare score against:&nbsp;
+      <select id="score-day-sel" onchange="renderScore()">
+        <option value="return_d1">D1 Return</option>
+        <option value="return_d3">D3 Return</option>
+        <option value="return_d5" selected>D5 Return</option>
+        <option value="return_d10">D10 Return</option>
+      </select>
+    </label>
+  </div>
+  <div class="grid2" style="margin-bottom:20px">
+    <div class="card">
+      <h3>Score vs Return</h3>
+      <div id="ch-scatter" class="chart-box"></div>
+    </div>
+    <div class="card">
+      <h3>Return Distribution</h3>
+      <div id="ch-dist" class="chart-box"></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Cumulative Return Over Time</h3>
+    <div id="ch-cum" style="width:100%;height:420px"></div>
+  </div>
+</div>
+
+<script>
+google.charts.load('current', { packages: ['corechart', 'bar'] });
+google.charts.setOnLoadCallback(function() {
+  google.script.run
+    .withSuccessHandler(onData)
+    .withFailureHandler(function(e) { showDebug('Script error: ' + e.message); })
+    .getData();
+});
+
+var ALL = [], FILTERED = [];
+var DAYS    = [1, 3, 5, 10];
+var DAY_KEYS = ['return_d1', 'return_d3', 'return_d5', 'return_d10'];
+
+var CHART_OPTS = {
+  col: function(extra) {
+    return Object.assign({ legend: 'none', bar: { groupWidth: '55%' }, chartArea: { width: '84%', height: '80%' } }, extra || {});
+  },
+  bar: function(extra) {
+    return Object.assign({ legend: 'none', bar: { groupWidth: '70%' }, chartArea: { width: '72%', height: '84%' } }, extra || {});
+  },
+  line: function(extra) {
+    return Object.assign({ pointSize: 7, lineWidth: 3, curveType: 'function', chartArea: { width: '86%', height: '80%' } }, extra || {});
+  },
+  scatter: function(extra) {
+    return Object.assign({ legend: 'none', colors: ['#1a1a2e'], pointSize: 6, chartArea: { width: '84%', height: '80%' } }, extra || {});
+  },
+  hist: function(extra) {
+    return Object.assign({ legend: 'none', colors: ['#3498db'], chartArea: { width: '84%', height: '80%' } }, extra || {});
+  }
+};
+
+// ── Data load ─────────────────────────────────────────────────────────────────
+
+function onData(result) {
+  var headers = result.headers;
+  var rows    = result.rows;
+
+  showDebug('Rows received: ' + result.total + ' | Columns: ' + headers.join(' · '));
+
+  function get(row, keys) {
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (row[k] !== undefined && row[k] !== '') return row[k];
+      for (var h in row) {
+        if (h.toLowerCase() === k.toLowerCase() && row[h] !== '' && row[h] !== undefined)
+          return row[h];
+      }
+    }
+    return '';
+  }
+
+  ALL = rows.map(function(r) {
+    var obj = {
+      date:       (get(r, ['date_time','date','datetime','timestamp']) || '').toString().slice(0, 10),
+      ticker:     (get(r, ['ticker','stock','symbol']) || '').toString().toUpperCase(),
+      price:      parseFloat(get(r, ['price'])) || 0,
+      change_pct: parseFloat(get(r, ['change_pct','change_%'])) || 0,
+      vol_ratio:  parseFloat(get(r, ['volume_ratio','vol_ratio'])) || 0,
+      rsi:        parseFloat(get(r, ['rsi'])) || 0,
+      confidence: (get(r, ['confidence']) || '').toString().trim(),
+      score:      parseFloat(get(r, ['score'])) || 0,
+      reasons:    (get(r, ['reasons','reason']) || '').toString(),
+    };
+    DAY_KEYS.forEach(function(k) {
+      obj[k] = parseFloat(get(r, [k]));
+    });
+    return obj;
+  }).filter(function(r) { return r.ticker !== ''; });
+
+  showDebug('Rows received: ' + result.total + ' | Mapped: ' + ALL.length + ' | Columns: ' + headers.join(' · '));
+
+  if (!ALL.length) {
+    document.getElementById('page-overview').innerHTML =
+      '<div class="loading">⚠️ Data received but no rows mapped. Check the debug bar.</div>';
+    return;
+  }
+
+  populateFilters();
+  applyFilters();
+  document.getElementById('page-overview').innerHTML = '';
+  renderOverview();
+}
+
+function showDebug(msg) {
+  var bar = document.getElementById('debug-bar');
+  bar.style.display = 'block';
+  bar.innerHTML = '🔍 ' + msg;
+}
+
+// ── Filters ───────────────────────────────────────────────────────────────────
+
+function populateFilters() {
+  var confs   = unique(ALL.map(function(r) { return r.confidence; })).sort();
+  var tickers = unique(ALL.map(function(r) { return r.ticker; })).sort();
+  confs.forEach(function(c)   { document.getElementById('f-conf').add(new Option(c, c)); });
+  tickers.forEach(function(t) { document.getElementById('f-ticker').add(new Option(t, t)); });
+  var dates = ALL.map(function(r) { return r.date; }).filter(Boolean).sort();
+  if (dates.length) {
+    document.getElementById('f-from').value = dates[0];
+    document.getElementById('f-to').value   = dates[dates.length - 1];
+  }
+}
+
+function applyFilters() {
+  var from   = document.getElementById('f-from').value;
+  var to     = document.getElementById('f-to').value;
+  var conf   = document.getElementById('f-conf').value;
+  var ticker = document.getElementById('f-ticker').value;
+
+  FILTERED = ALL.filter(function(r) {
+    if (from && r.date && r.date < from) return false;
+    if (to   && r.date && r.date > to)   return false;
+    if (conf   && r.confidence !== conf)   return false;
+    if (ticker && r.ticker !== ticker)     return false;
+    return true;
+  });
+
+  document.getElementById('count').textContent = FILTERED.length + ' of ' + ALL.length + ' signals';
+  renderOverview();
+  renderSignals();
+  renderWinRate();
+  renderHolding();
+  renderScore();
+}
+
+function resetFilters() {
+  document.getElementById('f-conf').value   = '';
+  document.getElementById('f-ticker').value = '';
+  var dates = ALL.map(function(r) { return r.date; }).filter(Boolean).sort();
+  if (dates.length) {
+    document.getElementById('f-from').value = dates[0];
+    document.getElementById('f-to').value   = dates[dates.length - 1];
+  }
+  applyFilters();
+}
+
+function showTab(name, el) {
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelectorAll('.tab').forEach(function(t)  { t.classList.remove('active'); });
+  document.getElementById('page-' + name).classList.add('active');
+  el.classList.add('active');
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function unique(arr) {
+  return arr.filter(function(v, i, a) { return v && a.indexOf(v) === i; });
+}
+function avgOf(arr) {
+  var v = arr.filter(function(x) { return !isNaN(x); });
+  return v.length ? v.reduce(function(s, x) { return s + x; }, 0) / v.length : NaN;
+}
+function fmtPct(v) {
+  return isNaN(v) ? '—' : (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
+}
+function retCell(v) {
+  if (isNaN(v)) return '<td>—</td>';
+  return '<td class="' + (v >= 0 ? 'pos' : 'neg') + '">' + fmtPct(v) + '</td>';
+}
+function drawChart(type, el, data, opts) {
+  new google.visualization[type](document.getElementById(el)).draw(data, opts);
+}
+
+// ── Overview ──────────────────────────────────────────────────────────────────
+
+function renderOverview() {
+  var f     = FILTERED;
+  var d5    = f.map(function(r) { return r.return_d5; }).filter(function(v) { return !isNaN(v); });
+  var wr    = d5.length ? ((d5.filter(function(v) { return v > 0; }).length / d5.length) * 100).toFixed(1) + '%' : '—';
+  var ar    = d5.length ? fmtPct(avgOf(d5)) : '—';
+  var avgS  = f.length  ? avgOf(f.map(function(r) { return r.score; })).toFixed(2) : '—';
+
+  document.getElementById('page-overview').innerHTML =
+    '<div class="metrics">' +
+      metricHtml('Total Signals',  f.length, '') +
+      metricHtml('Win Rate (D5)',   wr, d5.length + ' evaluated') +
+      metricHtml('Avg Return (D5)', ar, '') +
+      metricHtml('Avg Score',       avgS, '') +
+    '</div>' +
+    '<div class="grid2">' +
+      '<div class="card"><h3>Signals Per Day</h3><div id="ch-daily" class="chart-box"></div></div>' +
+      '<div class="card"><h3>Top 10 Tickers by Signal Count</h3><div id="ch-top" class="chart-box"></div></div>' +
+    '</div>';
+
+  renderDaily();
+  renderTop();
+}
+
+function metricHtml(lbl, val, sub) {
+  return '<div class="metric"><div class="lbl">' + lbl + '</div><div class="val">' + val + '</div><div class="sub">' + sub + '</div></div>';
+}
+
+function renderDaily() {
+  var counts = {};
+  FILTERED.forEach(function(r) { counts[r.date] = (counts[r.date] || 0) + 1; });
+  var rows = Object.entries(counts).sort(function(a, b) { return a[0] < b[0] ? -1 : 1; });
+  if (!rows.length) return;
+  var d = google.visualization.arrayToDataTable([['Date', 'Signals']].concat(rows));
+  drawChart('ColumnChart', 'ch-daily', d, CHART_OPTS.col({ colors: ['#1a1a2e'], vAxis: { minValue: 0, title: 'Signals' }, hAxis: { title: '' } }));
+}
+
+function renderTop() {
+  var counts = {};
+  FILTERED.forEach(function(r) { counts[r.ticker] = (counts[r.ticker] || 0) + 1; });
+  var rows = Object.entries(counts).sort(function(a, b) { return b[1] - a[1]; }).slice(0, 10);
+  if (!rows.length) return;
+  var d = google.visualization.arrayToDataTable([['Ticker', 'Signals']].concat(rows));
+  drawChart('BarChart', 'ch-top', d, CHART_OPTS.bar({ colors: ['#16213e'], hAxis: { title: 'Signals' } }));
+}
+
+// ── Signals Table ─────────────────────────────────────────────────────────────
+
+function renderSignals() {
+  var html = '';
+  [].concat(FILTERED).reverse().slice(0, 300).forEach(function(r) {
+    html += '<tr>' +
+      '<td>' + r.date + '</td>' +
+      '<td><b>' + r.ticker + '</b></td>' +
+      '<td>' + r.price.toLocaleString() + '</td>' +
+      '<td class="' + (r.change_pct >= 0 ? 'pos' : 'neg') + '">' + fmtPct(r.change_pct) + '</td>' +
+      '<td>' + r.vol_ratio.toFixed(1) + 'x</td>' +
+      '<td>' + r.rsi.toFixed(1) + '</td>' +
+      '<td><span class="badge ' + r.confidence + '">' + r.confidence + '</span></td>' +
+      '<td>' + r.score.toFixed(2) + '</td>' +
+      retCell(r.return_d1) + retCell(r.return_d3) + retCell(r.return_d5) + retCell(r.return_d10) +
+      '<td style="font-size:.76rem;color:#777">' + r.reasons + '</td>' +
+    '</tr>';
+  });
+  document.getElementById('tbl-signals').innerHTML = html ||
+    '<tr><td colspan="13" class="no-data">No signals</td></tr>';
+}
+
+// ── Win Rate ──────────────────────────────────────────────────────────────────
+
+function renderWinRate() {
+  var ev = FILTERED.filter(function(r) { return !isNaN(r.return_d5); });
+
+  if (!ev.length) {
+    ['ch-conf','ch-trig'].forEach(function(id) {
+      document.getElementById(id).innerHTML = '<div class="no-data">No outcome data yet — run fillReturnPct() in Apps Script</div>';
+    });
+    document.getElementById('tbl-ticker').innerHTML =
+      '<tr><td colspan="7" class="no-data">No outcome data yet</td></tr>';
+    return;
+  }
+
+  // by confidence
+  var byC = {};
+  ev.forEach(function(r) {
+    if (!byC[r.confidence]) byC[r.confidence] = { w: 0, t: 0 };
+    byC[r.confidence].t++;
+    if (r.return_d5 > 0) byC[r.confidence].w++;
+  });
+  var dc = google.visualization.arrayToDataTable(
+    [['Confidence', 'Win Rate %']].concat(
+      Object.entries(byC).map(function(e) { return [e[0], +(e[1].w / e[1].t * 100).toFixed(1)]; })
+    )
+  );
+  drawChart('ColumnChart', 'ch-conf', dc, CHART_OPTS.col({ colors: ['#2ecc71'], vAxis: { title: 'Win Rate %', maxValue: 100 }, hAxis: { title: 'Confidence' } }));
+
+  // by trigger
+  var byT = {};
+  ev.forEach(function(r) {
+    r.reasons.split(',').forEach(function(t) {
+      t = t.trim();
+      if (!t) return;
+      if (!byT[t]) byT[t] = { w: 0, t: 0 };
+      byT[t].t++;
+      if (r.return_d5 > 0) byT[t].w++;
+    });
+  });
+  var dt = google.visualization.arrayToDataTable(
+    [['Trigger', 'Win Rate %']].concat(
+      Object.entries(byT)
+        .sort(function(a, b) { return (b[1].w / b[1].t) - (a[1].w / a[1].t); })
+        .map(function(e) { return [e[0], +(e[1].w / e[1].t * 100).toFixed(1)]; })
+    )
+  );
+  drawChart('BarChart', 'ch-trig', dt, CHART_OPTS.bar({ colors: ['#3498db'], hAxis: { title: 'Win Rate %' } }));
+
+  // per ticker table
+  var byTk = {};
+  FILTERED.forEach(function(r) {
+    if (!byTk[r.ticker]) byTk[r.ticker] = { w: 0, t: 0, d1: [], d3: [], d5: [], d10: [] };
+    byTk[r.ticker].t++;
+    if (!isNaN(r.return_d1))  byTk[r.ticker].d1.push(r.return_d1);
+    if (!isNaN(r.return_d3))  byTk[r.ticker].d3.push(r.return_d3);
+    if (!isNaN(r.return_d5))  { byTk[r.ticker].d5.push(r.return_d5); if (r.return_d5 > 0) byTk[r.ticker].w++; }
+    if (!isNaN(r.return_d10)) byTk[r.ticker].d10.push(r.return_d10);
+  });
+
+  var html = '';
+  Object.entries(byTk)
+    .filter(function(e) { return e[1].d5.length > 0; })
+    .sort(function(a, b) { return avgOf(b[1].d5) - avgOf(a[1].d5); })
+    .forEach(function(e) {
+      var v  = e[1];
+      var wr = (v.w / v.d5.length * 100).toFixed(1);
+      html += '<tr>' +
+        '<td><b>' + e[0] + '</b></td>' +
+        '<td>' + v.t + '</td>' +
+        '<td>' + wr + '%</td>' +
+        retCell(avgOf(v.d1)) + retCell(avgOf(v.d3)) + retCell(avgOf(v.d5)) + retCell(avgOf(v.d10)) +
+      '</tr>';
+    });
+  document.getElementById('tbl-ticker').innerHTML = html ||
+    '<tr><td colspan="7" class="no-data">No data</td></tr>';
+}
+
+// ── Holding Period ────────────────────────────────────────────────────────────
+
+function renderHolding() {
+  var avgRow = [['Holding Day', 'Avg Return %', { role: 'style' }]];
+  var wrRow  = [['Holding Day', 'Win Rate %']];
+
+  DAYS.forEach(function(d, i) {
+    var vals = FILTERED.map(function(r) { return r[DAY_KEYS[i]]; }).filter(function(v) { return !isNaN(v); });
+    var a    = avgOf(vals);
+    var wr   = vals.length ? (vals.filter(function(v) { return v > 0; }).length / vals.length * 100) : NaN;
+    avgRow.push(['D' + d, isNaN(a)  ? 0 : parseFloat(a.toFixed(2)),  isNaN(a)  ? 'color:#ccc' : (a >= 0 ? 'color:#2ecc71' : 'color:#e74c3c')]);
+    wrRow.push( ['D' + d, isNaN(wr) ? 0 : parseFloat(wr.toFixed(1))]);
+  });
+
+  var da = google.visualization.arrayToDataTable(avgRow);
+  drawChart('ColumnChart', 'ch-holding-avg', da, CHART_OPTS.col({ vAxis: { title: 'Avg Return %', baseline: 0 }, hAxis: { title: 'Holding Day' } }));
+
+  var dw = google.visualization.arrayToDataTable(wrRow);
+  drawChart('ColumnChart', 'ch-holding-wr', dw, CHART_OPTS.col({ colors: ['#3498db'], vAxis: { title: 'Win Rate %', maxValue: 100, baseline: 0 }, hAxis: { title: 'Holding Day' } }));
+
+  // line chart — top 5 tickers
+  var topTickers = Object.entries(
+    FILTERED.reduce(function(acc, r) { acc[r.ticker] = (acc[r.ticker] || 0) + 1; return acc; }, {})
+  ).sort(function(a, b) { return b[1] - a[1]; }).slice(0, 5).map(function(e) { return e[0]; });
+
+  var lineData = [['Day'].concat(topTickers)];
+  DAYS.forEach(function(d, i) {
+    var row = ['D' + d];
+    topTickers.forEach(function(t) {
+      var vals = FILTERED.filter(function(r) { return r.ticker === t; })
+                         .map(function(r) { return r[DAY_KEYS[i]]; })
+                         .filter(function(v) { return !isNaN(v); });
+      row.push(vals.length ? parseFloat(avgOf(vals).toFixed(2)) : null);
+    });
+    lineData.push(row);
+  });
+
+  var dl = google.visualization.arrayToDataTable(lineData);
+  drawChart('LineChart', 'ch-holding-line', dl, CHART_OPTS.line({
+    vAxis: { title: 'Avg Return %', baseline: 0 },
+    hAxis: { title: 'Holding Day' },
+    legend: { position: 'right' }
+  }));
+
+  // best day per ticker table
+  var byTk = {};
+  FILTERED.forEach(function(r) {
+    if (!byTk[r.ticker]) byTk[r.ticker] = { d1: [], d3: [], d5: [], d10: [] };
+    if (!isNaN(r.return_d1))  byTk[r.ticker].d1.push(r.return_d1);
+    if (!isNaN(r.return_d3))  byTk[r.ticker].d3.push(r.return_d3);
+    if (!isNaN(r.return_d5))  byTk[r.ticker].d5.push(r.return_d5);
+    if (!isNaN(r.return_d10)) byTk[r.ticker].d10.push(r.return_d10);
+  });
+
+  var html = '';
+  Object.entries(byTk)
+    .filter(function(e) { return e[1].d5.length > 0; })
+    .forEach(function(e) {
+      var v     = e[1];
+      var avgs  = [avgOf(v.d1), avgOf(v.d3), avgOf(v.d5), avgOf(v.d10)];
+      var best  = avgs.reduce(function(bi, a, i) { return (!isNaN(a) && (isNaN(avgs[bi]) || a > avgs[bi])) ? i : bi; }, 0);
+      var bVals = [v.d1, v.d3, v.d5, v.d10][best];
+      var bWr   = bVals.length ? (bVals.filter(function(x) { return x > 0; }).length / bVals.length * 100).toFixed(1) + '%' : '—';
+      html += '<tr>' +
+        '<td><b>' + e[0] + '</b></td>' +
+        '<td><b>D' + DAYS[best] + '</b></td>' +
+        retCell(avgs[best]) +
+        '<td>' + bWr + '</td>' +
+        '<td>' + bVals.length + '</td>' +
+      '</tr>';
+    });
+
+  document.getElementById('tbl-holding-best').innerHTML = html ||
+    '<tr><td colspan="5" class="no-data">No outcome data yet</td></tr>';
+}
+
+// ── Score Analysis ────────────────────────────────────────────────────────────
+
+function renderScore() {
+  var sel = document.getElementById('score-day-sel');
+  var key = sel ? sel.value : 'return_d5';
+  var ev  = FILTERED.filter(function(r) { return !isNaN(r[key]); });
+
+  if (!ev.length) {
+    ['ch-scatter','ch-dist','ch-cum'].forEach(function(id) {
+      document.getElementById(id).innerHTML = '<div class="no-data">No outcome data yet</div>';
+    });
+    return;
+  }
+
+  // scatter
+  var ds = new google.visualization.DataTable();
+  ds.addColumn('number', 'Score');
+  ds.addColumn('number', 'Return %');
+  ds.addColumn({ type: 'string', role: 'tooltip' });
+  ev.forEach(function(r) {
+    ds.addRow([r.score, r[key], r.ticker + '\nScore: ' + r.score + '\nReturn: ' + r[key].toFixed(2) + '%']);
+  });
+  drawChart('ScatterChart', 'ch-scatter', ds, CHART_OPTS.scatter({ hAxis: { title: 'Signal Score' }, vAxis: { title: 'Return %', baseline: 0 } }));
+
+  // histogram
+  var dd = google.visualization.arrayToDataTable([['Return %']].concat(ev.map(function(r) { return [r[key]]; })));
+  drawChart('Histogram', 'ch-dist', dd, CHART_OPTS.hist({ hAxis: { title: 'Return %' } }));
+
+  // cumulative line
+  var sorted = [].concat(ev).sort(function(a, b) { return a.date < b.date ? -1 : 1; });
+  var cum = 0;
+  var dc = google.visualization.arrayToDataTable(
+    [['Date', 'Cumulative %']].concat(
+      sorted.map(function(r) { cum += r[key]; return [r.date, parseFloat(cum.toFixed(2))]; })
+    )
+  );
+  drawChart('LineChart', 'ch-cum', dc, CHART_OPTS.line({
+    colors: ['#2ecc71'],
+    vAxis: { title: 'Cumulative Return %', baseline: 0 },
+    hAxis: { title: '' },
+    legend: 'none'
+  }));
+}
+</script>
+</body>
+</html>
